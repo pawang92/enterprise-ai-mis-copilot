@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Enterprise AI Insights & MIS Copilot
 
 A local, synthetic-data prototype for a Data Scientist role involving analytics, RAG/KAG, agentic AI, MIS reporting, and enterprise lifecycle practices.
@@ -64,3 +65,7 @@ A deliberate sales drop and low inventory snapshot are included for testing. Dat
 ## Important limitations
 
 This is a portfolio prototype, not a validated pharmaceutical compliance system. Do not use patient data, confidential company data, or real operational decisions without authorization, security review, data governance, and human validation.
+=======
+# enterprise-ai-mis-copilot
+Enterprise AI Insights &amp; MIS Copilot using RAG, KAG, LangGraph and Python analytics
+>>>>>>> origin/main
