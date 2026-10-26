@@ -1,0 +1,32 @@
+[
+  {
+    "id": "inventory-low-cover",
+    "query": "What should happen when inventory is below seven days of cover?",
+    "expected_sources": ["inventory_sop.md"]
+  },
+  {
+    "id": "reorder-review",
+    "query": "Should low stock automatically create a purchase order?",
+    "expected_sources": ["inventory_sop.md"]
+  },
+  {
+    "id": "sales-investigation",
+    "query": "How should a sales decline be investigated?",
+    "expected_sources": ["sales_sop.md"]
+  },
+  {
+    "id": "sales-root-cause",
+    "query": "Does a statistical anomaly prove the root cause?",
+    "expected_sources": ["sales_sop.md"]
+  },
+  {
+    "id": "privacy-governance",
+    "query": "What are the privacy and auditability requirements?",
+    "expected_sources": ["data_governance_sop.md"]
+  },
+  {
+    "id": "unanswerable",
+    "query": "What is the procedure for quantum spacecraft archaeology?",
+    "expected_sources": []
+  }
+]

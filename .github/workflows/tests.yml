@@ -2,7 +2,7 @@ name: Python tests
 
 on:
   push:
-    branches: [main, "fix/**"]
+    branches: [main, "fix/**", "feat/**"]
   pull_request:
     branches: [main]
 
@@ -30,6 +30,12 @@ jobs:
 
       - name: Generate synthetic data
         run: python -m app.data.generate
+
+      - name: Compile application modules
+        run: python -m compileall -q app dashboard.py scripts
+
+      - name: Evaluate local RAG
+        run: python scripts/evaluate_rag.py --k 3
 
       - name: Run test suite
         run: python -m pytest -q
