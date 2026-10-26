@@ -20,6 +20,20 @@ def test_monthly_kpis_calculates_target_attainment():
     assert result.loc[1, "target_attainment_pct"] == 120.0
 
 
+def test_zero_target_yields_null_attainment_not_infinity():
+    sales = pd.DataFrame({
+        "month": pd.to_datetime(["2026-01-01"]),
+        "revenue": [0.0],
+        "units_sold": [0],
+    })
+    targets = pd.DataFrame({
+        "month": pd.to_datetime(["2026-01-01"]),
+        "target_revenue": [0.0],
+    })
+    result = monthly_kpis(sales, targets)
+    assert pd.isna(result.loc[0, "target_attainment_pct"])
+
+
 def test_detects_decline_against_prior_three_months():
     sales = pd.DataFrame({
         "month": pd.date_range("2026-01-01", periods=5, freq="MS"),
@@ -30,6 +44,17 @@ def test_detects_decline_against_prior_three_months():
     result = detect_sales_declines(sales, threshold_pct=-20, window=3)
     assert len(result) == 1
     assert result.iloc[0]["change_pct"] == -40.0
+
+
+def test_sales_declines_rejects_invalid_window():
+    sales = pd.DataFrame({
+        "month": pd.date_range("2026-01-01", periods=4, freq="MS"),
+        "product_id": ["P1"] * 4,
+        "region": ["West"] * 4,
+        "revenue": [100.0, 100.0, 100.0, 50.0],
+    })
+    with pytest.raises(ValueError, match="window"):
+        detect_sales_declines(sales, window=0)
 
 
 def test_detect_inventory_by_low_cover_and_reorder_level():
@@ -44,12 +69,13 @@ def test_detect_inventory_by_low_cover_and_reorder_level():
     assert set(result["product_id"]) == {"P1", "P2"}
 
 
-def test_sales_declines_rejects_invalid_window():
-    sales = pd.DataFrame({
-        "month": pd.date_range("2026-01-01", periods=4, freq="MS"),
-        "product_id": ["P1"] * 4,
-        "region": ["West"] * 4,
-        "revenue": [100.0, 100.0, 100.0, 50.0],
+def test_inventory_rejects_negative_stock():
+    inventory = pd.DataFrame({
+        "product_id": ["P1"],
+        "region": ["West"],
+        "stock_units": [-1],
+        "days_of_inventory": [5],
+        "reorder_level_units": [10],
     })
-    with pytest.raises(ValueError, match="window"):
-        detect_sales_declines(sales, window=0)
+    with pytest.raises(ValueError, match="non-negative"):
+        detect_inventory_risks(inventory)
