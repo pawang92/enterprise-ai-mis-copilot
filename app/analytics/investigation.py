@@ -33,17 +33,17 @@ def build_investigation(
         inventory = inventory[inventory["region"].astype(str).str.casefold() == region.casefold()]
 
     anomalies = detect_sales_declines(sales, threshold_pct=sales_threshold_pct)
-    inventory_risks = detect_inventory_risks(
-        inventory, low_days_threshold=low_inventory_days
-    )
 
     if not inventory.empty and "snapshot_date" in inventory.columns:
         inventory["snapshot_date"] = pd.to_datetime(inventory["snapshot_date"])
         latest_date = inventory["snapshot_date"].max()
-        latest_inventory = inventory[inventory["snapshot_date"] == latest_date]
+        latest_inventory = inventory[inventory["snapshot_date"] == latest_date].copy()
     else:
-        latest_inventory = inventory
+        latest_inventory = inventory.copy()
 
+    inventory_risks = detect_inventory_risks(
+        latest_inventory, low_days_threshold=low_inventory_days
+    )
     inventory_columns = [
         c for c in (
             "product_id", "region", "snapshot_date", "stock_units",
@@ -66,12 +66,11 @@ def build_investigation(
             & (latest_records["region"] == row["region"])
         ]
         inv = inv_rows.iloc[0].to_dict() if not inv_rows.empty else {}
-        is_inventory_risk = key in risk_keys
-        query = (
+        evidence = rag.retrieve(
             "sales decline investigation historical baseline regional trends "
-            "product availability sales targets data quality"
+            "product availability sales targets data quality",
+            top_k=top_k_evidence,
         )
-        evidence = rag.retrieve(query, top_k=top_k_evidence)
         findings.append({
             "signal_type": "sales_decline",
             "month": pd.Timestamp(row["month"]).strftime("%Y-%m"),
@@ -90,10 +89,14 @@ def build_investigation(
                 "stock_units": _safe_number(inv.get("stock_units")),
                 "days_of_inventory": _safe_number(inv.get("days_of_inventory")),
                 "reorder_level_units": _safe_number(inv.get("reorder_level_units")),
-                "risk_detected": is_inventory_risk,
+                "risk_detected": key in risk_keys,
             },
             "evidence": [
-                {"source": item["source"], "score": item["score"], "excerpt": item["text"][:500]}
+                {
+                    "source": item["source"],
+                    "score": item["score"],
+                    "excerpt": item["text"][:500],
+                }
                 for item in evidence
             ],
             "interpretation": (
