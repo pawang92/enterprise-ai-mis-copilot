@@ -86,14 +86,23 @@ if selected_region != "All":
 if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
     start_date, end_date = pd.Timestamp(date_range[0]), pd.Timestamp(date_range[1])
     filtered_sales = filtered_sales[
-        filtered_sales["month"].between(start_date, end_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))
+        filtered_sales["month"].between(
+            start_date, end_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        )
     ]
 
 filtered_tables = {**tables, "sales": filtered_sales, "inventory": filtered_inventory}
 kpis = monthly_kpis(filtered_sales, tables["targets"])
 sales_anomalies = detect_sales_declines(filtered_sales, threshold_pct=float(threshold))
+latest_inventory_date = (
+    filtered_inventory["snapshot_date"].max() if not filtered_inventory.empty else None
+)
+latest_inventory_for_risks = (
+    filtered_inventory[filtered_inventory["snapshot_date"] == latest_inventory_date]
+    if latest_inventory_date is not None else filtered_inventory
+)
 inventory_risks = detect_inventory_risks(
-    filtered_inventory, low_days_threshold=int(low_days)
+    latest_inventory_for_risks, low_days_threshold=int(low_days)
 )
 
 latest_kpi = kpis.sort_values("month").iloc[-1] if not kpis.empty else None
@@ -137,13 +146,12 @@ with sales_tab:
 
 with inventory_tab:
     st.subheader("Latest inventory position")
-    latest_date = filtered_inventory["snapshot_date"].max() if not filtered_inventory.empty else None
-    latest_inventory = (
-        filtered_inventory[filtered_inventory["snapshot_date"] == latest_date]
-        if latest_date is not None else filtered_inventory
+    st.caption(
+        f"Latest snapshot: {latest_inventory_date.date() if latest_inventory_date is not None else 'No data'}"
     )
-    st.caption(f"Latest snapshot: {latest_date.date() if latest_date is not None else 'No data'}")
-    st.dataframe(latest_inventory, use_container_width=True, hide_index=True)
+    st.dataframe(
+        latest_inventory_for_risks, use_container_width=True, hide_index=True
+    )
     st.subheader("Inventory risks")
     if inventory_risks.empty:
         st.success("No inventory risks crossed the selected thresholds.")
@@ -167,8 +175,8 @@ with investigate_tab:
                 low_inventory_days=int(low_days),
                 rag=cached_rag(),
             )
-        st.metric("Findings", investigation["sales_signal_count"])
-        st.metric("Inventory risks", investigation["inventory_risk_count"])
+        st.metric("Sales findings", investigation["sales_signal_count"])
+        st.metric("Latest inventory risks", investigation["inventory_risk_count"])
         if not investigation["findings"]:
             st.info("No sales decline findings matched the current filters.")
         for index, finding in enumerate(investigation["findings"], start=1):
@@ -205,10 +213,14 @@ with rag_tab:
         with st.spinner("Evaluating labelled queries..."):
             evaluation = evaluate_retrieval(rag=cached_rag(), k=int(k))
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric(f"Hit rate@{k}", f"{evaluation[f'hit_rate_at_{k}']:.1%}" if evaluation[f"hit_rate_at_{k}"] is not None else "—")
-        c2.metric(f"MRR@{k}", f"{evaluation[f'mrr_at_{k}']:.3f}" if evaluation[f"mrr_at_{k}"] is not None else "—")
-        c3.metric("No-answer accuracy", f"{evaluation['no_answer_accuracy']:.1%}" if evaluation["no_answer_accuracy"] is not None else "—")
-        c4.metric("Case pass rate", f"{evaluation['overall_case_pass_rate']:.1%}" if evaluation["overall_case_pass_rate"] is not None else "—")
+        hit_rate = evaluation[f"hit_rate_at_{k}"]
+        mrr = evaluation[f"mrr_at_{k}"]
+        no_answer = evaluation["no_answer_accuracy"]
+        pass_rate = evaluation["overall_case_pass_rate"]
+        c1.metric(f"Hit rate@{k}", f"{hit_rate:.1%}" if hit_rate is not None else "—")
+        c2.metric(f"MRR@{k}", f"{mrr:.3f}" if mrr is not None else "—")
+        c3.metric("No-answer accuracy", f"{no_answer:.1%}" if no_answer is not None else "—")
+        c4.metric("Case pass rate", f"{pass_rate:.1%}" if pass_rate is not None else "—")
         st.dataframe(pd.DataFrame(evaluation["results"]), use_container_width=True, hide_index=True)
         for note in evaluation["notes"]:
             st.caption(note)
