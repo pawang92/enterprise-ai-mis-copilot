@@ -36,8 +36,10 @@ def build_investigation(
 
     if not inventory.empty and "snapshot_date" in inventory.columns:
         inventory["snapshot_date"] = pd.to_datetime(inventory["snapshot_date"])
-        latest_date = inventory["snapshot_date"].max()
-        latest_inventory = inventory[inventory["snapshot_date"] == latest_date].copy()
+        latest_by_group = inventory.groupby(
+            ["product_id", "region"]
+        )["snapshot_date"].transform("max")
+        latest_inventory = inventory[inventory["snapshot_date"] == latest_by_group].copy()
     else:
         latest_inventory = inventory.copy()
 
