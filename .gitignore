@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Generated data and reports
+data/raw/*.csv
+data/processed/*.csv
+reports/*
+!reports/.gitkeep
+
+# IDE
+.vscode/
+.idea/
