@@ -1,4 +1,6 @@
 class BusinessKnowledgeGraph:
+    """Minimal in-memory entity-relation graph for prototype queries."""
+
     def __init__(self):
         self.triples = [
             ("MED001", "belongs_to", "Cardiology"),
@@ -13,31 +15,42 @@ class BusinessKnowledgeGraph:
             ("Sales Decline", "requires_investigation_by", "Business Analyst"),
         ]
 
-    def query(self, question: str):
-        terms = {
-            term.strip(".,?!:;").lower()
-            for term in question.split()
-        }
+    def query(self, question: str) -> list[dict[str, str]]:
+        """Return triples matching explicit entity/relation terms in a query.
 
-        matches = []
+        Prefer exact entity matches; this keeps product-specific questions from
+        accidentally returning unrelated triples due to common words.
+        """
+        normalized = question.lower().replace("-", " ")
+        exact_entities = [
+            (subject, relation, obj)
+            for subject, relation, obj in self.triples
+            if subject.lower() in normalized or obj.lower() in normalized
+        ]
 
-        for subject, relation, obj in self.triples:
-            searchable = {
-                subject.lower(),
-                relation.lower(),
-                obj.lower(),
+        if exact_entities:
+            matches = exact_entities
+        else:
+            terms = {
+                token.strip(".,?!:;()").lower()
+                for token in normalized.split()
             }
+            matches = []
+            for subject, relation, obj in self.triples:
+                searchable = {
+                    subject.lower(),
+                    relation.replace("_", " ").lower(),
+                    obj.lower(),
+                }
+                if any(
+                    term in item
+                    for term in terms
+                    for item in searchable
+                    if len(term) >= 4
+                ):
+                    matches.append((subject, relation, obj))
 
-            if any(
-                term in item or item in term
-                for term in terms
-                for item in searchable
-                if len(term) >= 3
-            ):
-                matches.append({
-                    "subject": subject,
-                    "relation": relation,
-                    "object": obj,
-                })
-
-        return matches
+        return [
+            {"subject": subject, "relation": relation, "object": obj}
+            for subject, relation, obj in matches
+        ]
