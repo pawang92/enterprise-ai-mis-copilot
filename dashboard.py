@@ -83,6 +83,8 @@ if selected_product != "All":
 if selected_region != "All":
     filtered_sales = filtered_sales[filtered_sales["region"] == selected_region]
     filtered_inventory = filtered_inventory[filtered_inventory["region"] == selected_region]
+investigation_sales = filtered_sales.copy()
+start_date, end_date = pd.Timestamp(min_month), pd.Timestamp(max_month)
 if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
     start_date, end_date = pd.Timestamp(date_range[0]), pd.Timestamp(date_range[1])
     filtered_sales = filtered_sales[
@@ -91,9 +93,12 @@ if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
         )
     ]
 
-filtered_tables = {**tables, "sales": filtered_sales, "inventory": filtered_inventory}
+filtered_tables = {**tables, "sales": investigation_sales, "inventory": filtered_inventory}
 kpis = monthly_kpis(filtered_sales, tables["targets"])
-sales_anomalies = detect_sales_declines(filtered_sales, threshold_pct=float(threshold))
+sales_anomalies = detect_sales_declines(investigation_sales, threshold_pct=float(threshold))
+sales_anomalies = sales_anomalies[
+    pd.to_datetime(sales_anomalies["month"]).between(start_date, end_date + pd.Timedelta(days=1))
+]
 latest_inventory_date = (
     filtered_inventory["snapshot_date"].max() if not filtered_inventory.empty else None
 )
@@ -175,11 +180,15 @@ with investigate_tab:
                 low_inventory_days=int(low_days),
                 rag=cached_rag(),
             )
-        st.metric("Sales findings", investigation["sales_signal_count"])
+        visible_findings = [
+            finding for finding in investigation["findings"]
+            if start_date <= pd.Timestamp(finding["month"] + "-01") <= end_date
+        ]
+        st.metric("Sales findings", len(visible_findings))
         st.metric("Latest inventory risks", investigation["inventory_risk_count"])
-        if not investigation["findings"]:
+        if not visible_findings:
             st.info("No sales decline findings matched the current filters.")
-        for index, finding in enumerate(investigation["findings"], start=1):
+        for index, finding in enumerate(visible_findings, start=1):
             with st.expander(
                 f"{index}. {finding['product_id']} / {finding['region']} / "
                 f"{finding['month']} ({finding['change_pct']:.1f}%)",
