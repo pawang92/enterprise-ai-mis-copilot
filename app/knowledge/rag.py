@@ -5,73 +5,63 @@ from app.knowledge.documents import load_documents
 
 
 class LocalRAG:
+    """Small local lexical retriever over Markdown SOP documents."""
+
     def __init__(self):
         self.documents = load_documents()
-
         if not self.documents:
-            raise ValueError(
-                "No knowledge documents found in knowledge_base/"
-            )
+            raise ValueError("No knowledge documents found in knowledge_base/")
 
         self.vectorizer = TfidfVectorizer(
             lowercase=True,
             stop_words="english",
             ngram_range=(1, 2),
         )
-
         self.matrix = self.vectorizer.fit_transform(
-            [doc["text"] for doc in self.documents]
+            [document["text"] for document in self.documents]
         )
 
-    def retrieve(self, question: str, top_k: int = 3):
-        if not question.strip():
+    def retrieve(self, question: str, top_k: int = 3) -> list[dict]:
+        if not question or not question.strip() or top_k < 1:
             return []
 
         query_vector = self.vectorizer.transform([question])
-        scores = cosine_similarity(
-            query_vector, self.matrix
-        ).ravel()
-
+        scores = cosine_similarity(query_vector, self.matrix).ravel()
         ranked_indices = scores.argsort()[::-1][:top_k]
         results = []
 
         for index in ranked_indices:
             score = float(scores[index])
-
             if score <= 0:
                 continue
-
-            doc = self.documents[index]
+            document = self.documents[index]
             results.append({
-                "source": doc["source"],
+                "source": document["source"],
                 "score": round(score, 4),
-                "text": doc["text"],
+                "text": document["text"],
             })
-
         return results
 
-    def answer(self, question: str):
+    def answer(self, question: str) -> dict:
         results = self.retrieve(question)
-
         if not results:
             return {
                 "answer": (
-                    "I could not find relevant supporting "
-                    "information in the available SOP documents."
+                    "I could not find relevant supporting information "
+                    "in the available SOP documents."
                 ),
                 "sources": [],
+                "grounded": False,
             }
 
         context = "\n\n".join(
             f"Source: {item['source']}\n{item['text']}"
             for item in results
         )
-
-        # Extractive, deterministic baseline; no LLM required.
         return {
             "answer": (
-                "Relevant information retrieved from the "
-                "available SOP documents:\n\n" + context
+                "Relevant information retrieved from the available "
+                f"SOP documents:\n\n{context}"
             ),
             "sources": [
                 {
@@ -80,4 +70,5 @@ class LocalRAG:
                 }
                 for item in results
             ],
+            "grounded": True,
         }
